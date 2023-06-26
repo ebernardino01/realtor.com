@@ -1,9 +1,9 @@
 from collections import OrderedDict
 
-from .base import BaseSpider
+from .base import RealtorSpider
 
 
-class AgentSpider(BaseSpider):
+class AgentSpider(RealtorSpider):
     name = 'agent'
 
     def parse_results(self, response):
