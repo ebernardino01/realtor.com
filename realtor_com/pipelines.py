@@ -71,6 +71,9 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
         if not existing_property:
             property_item = Property()
             property_item.data_id = item['data_id']
+            property_item.url = item['url']
+            property_item.media_img = item['media_img']
+            property_item.status = item['status']
             property_item.price = item['price']
             property_item.beds = item['beds']
             property_item.baths = item['baths']
@@ -80,7 +83,6 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
             property_item.city = item['city']
             property_item.state = item['state']
             property_item.zip_code = item['zip_code']
-            property_item.url = item['url']
             property_item.scraped_date_time = item['scraped_date_time']
             self.scraped_items.append(property_item)
 

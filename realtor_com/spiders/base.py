@@ -34,7 +34,7 @@ class BaseSpider(Spider):
             callback=self.parse_results,
             headers=self.headers
         )
-
+    
 
 class RealtorSpider(BaseSpider):
     name = 'realtor'
@@ -44,7 +44,6 @@ class RealtorSpider(BaseSpider):
         self.results_by_page = get_project_settings().get('REALTOR_RESULTS_BY_PAGE')
     
 
-     # Use an initial website to start scrapy request
     def start_requests(self):
         yield Request(
             url=self.search_url,

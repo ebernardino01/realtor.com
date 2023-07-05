@@ -44,6 +44,9 @@ class Property(DeclarativeBase):
 
     id = Column("id", BigInteger, primary_key=True)
     data_id = Column(BigInteger, index=True)
+    url = Column("url", String)
+    media_img = Column("media_img", String)
+    status = Column("status", String)
     price = Column("price", String)
     beds = Column("beds", String)
     baths = Column("baths", String)
@@ -53,5 +56,4 @@ class Property(DeclarativeBase):
     city = Column("city", String)
     state = Column("state", String)
     zip_code = Column("zip_code", String)
-    url = Column("url", String)
     scraped_date_time = Column('scraped_date_time', DateTime)
