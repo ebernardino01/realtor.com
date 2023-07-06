@@ -5,6 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.sqltypes import (
     BigInteger,
     DateTime,
+    Float,
     String
 )
 
@@ -50,8 +51,8 @@ class Property(DeclarativeBase):
     price = Column("price", String)
     beds = Column("beds", String)
     baths = Column("baths", String)
-    sqft = Column("sqft", String)
-    sqftlot = Column("sqftlot", String)
+    sqft = Column("sqft", Float)
+    sqftlot = Column("sqftlot", Float)
     address = Column("address", String)
     city = Column("city", String)
     state = Column("state", String)
