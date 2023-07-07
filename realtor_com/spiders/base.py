@@ -53,13 +53,13 @@ class RealtorSpider(BaseSpider):
 
 
     def parse_count(self, response):
-        results_xpath = response.xpath("//span[contains(@class, 'jsx-2957100293')]/span/text()")
+        results_xpath = response.xpath("//span[contains(@class, 'jsx-2957100293')]/span/text()").get()
         if not results_xpath:
-            results_xpath = response.xpath("//span[contains(@class, 'jsx-2957100293')]/text()")
+            results_xpath = response.xpath("//div[contains(@data-testid, 'total-results')]/text()").get()
 
         # Get results count to determine page count
-        results_label = results_xpath[1].get()
-        results_count = results_label.split(' ')[0].replace(',', '')
+        results_label = results_xpath.split(' ') if results_xpath else []
+        results_count = results_label[0].replace(',', '') if results_label else 0
 
         # Round the result to the nearest whole number
         page_count = int(-(-(int(results_count)) // self.results_by_page))
