@@ -67,7 +67,6 @@ REQ_HEADERS_UPGRADE_INSECURE_REQUESTS = '1'
 #}
 DOWNLOADER_MIDDLEWARES = {
     'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
-    #'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
     'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400,
     'scrapy_fake_useragent.middleware.RetryUserAgentMiddleware': 401,
     'scrapy_proxy_pool.middlewares.ProxyPoolMiddleware': 610,
@@ -126,3 +125,6 @@ FAKEUSERAGENT_PROVIDERS = [
 # Scrapy proxy pool
 PROXY_POOL_ENABLED = True
 PROXY_POOL_BAN_POLICY = 'realtor_com.policy.BanDetectionPolicyNotText'
+
+RETRY_TIMES = 2
+RETRY_HTTP_CODES = [500, 502, 503, 504, 522, 524, 400, 403, 408, 429]

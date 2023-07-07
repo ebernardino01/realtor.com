@@ -1,5 +1,8 @@
 from datetime import datetime
 from collections import OrderedDict
+from http import HTTPStatus
+
+from scrapy.spidermiddlewares.httperror import HttpError
 
 from .base import BaseSpider
 
@@ -16,6 +19,18 @@ class PropertySpider(BaseSpider):
         # Check if error page is shown
         error_xpath = response.xpath("//div[contains(@class, 'error-404')]")
         if not error_xpath:
+            # Check how many pages are present
+            last_page_element = response.xpath('//a[contains(@aria-label, "Go to next page")]/preceding-sibling::a[1]/@href').get()
+            last_page_element_list = last_page_element.split('pg-') if last_page_element else []
+            page_urls = OrderedDict()
+            if len(last_page_element_list) > 1:
+                # Construct the list of URLs based from the last page number
+                last_page = last_page_element_list[1]
+                if int(last_page) != 1:
+                    for page in range(2, int(last_page) + 1):
+                        page_urls[page] = f'{last_page_element_list[0]}pg-{page}'
+
+            # Loop through each property items
             for row in response.xpath("//div[contains(@class, 'BasePropertyCard_propertyCardWrap__J0xUj')]"):
                 # Get unique property id
                 property_item = OrderedDict()
@@ -90,14 +105,20 @@ class PropertySpider(BaseSpider):
                 property_item['scraped_date_time'] = datetime.now()
                 yield property_item
 
-            # Check if next page is accessible
-            next_page_element = response.xpath('//a[contains(@aria-label, "Go to next page")]')
-            next_page = next_page_element.xpath('./@class').get()
-            if 'disabled' not in next_page:
-                next_page_url = next_page_element.xpath('./@href').get()
-                if next_page_url:
-                    yield response.follow(
-                        url=next_page_url,
-                        callback=self.parse_results,
-                        headers=self.headers
-                    )
+            # Loop through the URL list for the succeeding pages
+            for index in sorted(page_urls.keys()):
+                yield response.follow(
+                    url=page_urls[index],
+                    callback=self.parse_results,
+                    headers=self.headers,
+                    errback=self.handle_error
+                )
+
+
+    def handle_error(self, failure):
+        # Check if the failure is due to a 403 error
+        if failure.check(HttpError) and failure.value.response.status == HTTPStatus.FORBIDDEN:
+            self.logger.warning("Skipping URL due to 403 error: %s", failure.request.url)
+        else:
+            # Handle other types of errors if needed
+            self.logger.error("Error processing URL: %s", failure.request.url)
