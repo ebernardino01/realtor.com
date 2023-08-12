@@ -2,15 +2,10 @@ from dotenv import dotenv_values
 from sqlalchemy import Column, create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql.sqltypes import (
-    BigInteger,
-    DateTime,
-    Float,
-    String
-)
+from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Float, String
 
 
-env = dotenv_values('.env')
+env = dotenv_values(".env")
 DeclarativeBase = declarative_base()
 
 
@@ -19,11 +14,7 @@ def db_connect() -> Engine:
     Creates database connection using database settings.
     Returns sqlalchemy engine instance
     """
-    return create_engine(
-        env.get('POSTGRES_URL'),
-        pool_size=30,
-        max_overflow=0
-    )
+    return create_engine(env.get("POSTGRES_URL"), pool_size=30, max_overflow=0)
 
 
 def create_table(engine: Engine):
@@ -57,4 +48,4 @@ class Property(DeclarativeBase):
     city = Column("city", String)
     state = Column("state", String)
     zip_code = Column("zip_code", String)
-    scraped_date_time = Column('scraped_date_time', DateTime)
+    scraped_date_time = Column("scraped_date_time", DateTime)

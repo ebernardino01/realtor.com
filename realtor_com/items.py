@@ -2,10 +2,10 @@
 #
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/items.html
-import six
-
-from scrapy.item import Item
 from collections import OrderedDict
+
+import six
+from scrapy.item import Item
 
 
 class OrderedItem(Item):
