@@ -112,6 +112,9 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 FEED_EXPORT_ENCODING = "utf-8"
 
 # Spider specific settings
+REALTOR_POSTGRES_URL_LOCAL = (
+    "postgresql+psycopg2://postgres:PostgresPass1234!@localhost:5432/realtor"
+)
 REALTOR_RESULTS_BY_PAGE = 20
 REALTOR_SCRAPED_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 

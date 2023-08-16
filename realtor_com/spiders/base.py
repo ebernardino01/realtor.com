@@ -1,5 +1,4 @@
-from scrapy import Spider, Request
-
+from scrapy import Request, Spider
 from scrapy.utils.project import get_project_settings
 
 
@@ -24,6 +23,7 @@ class BaseSpider(Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.base_url = "https://www.realtor.com"
+        self.search_url = ""
 
     # Use an initial website to start scrapy request
     def start_requests(self):
@@ -31,13 +31,12 @@ class BaseSpider(Spider):
             url=self.search_url, callback=self.parse_results, headers=self.headers
         )
 
+    def parse_results(self):
+        pass
+
 
 class RealtorSpider(BaseSpider):
     name = "realtor"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.results_by_page = get_project_settings().get("REALTOR_RESULTS_BY_PAGE")
 
     def start_requests(self):
         yield Request(
@@ -54,11 +53,14 @@ class RealtorSpider(BaseSpider):
             ).get()
 
         # Get results count to determine page count
+        results_by_page = get_project_settings().get("REALTOR_RESULTS_BY_PAGE")
         results_label = results_xpath.split(" ") if results_xpath else []
         results_count = results_label[0].replace(",", "") if results_label else 0
 
         # Round the result to the nearest whole number
-        page_count = int(-(-(int(results_count)) // self.results_by_page))
+        if results_by_page is None:
+            results_by_page = 1
+        page_count = int(-(-(int(results_count)) // int(results_by_page)))
 
         # Loop through each page
         for page in range(1, page_count + 1):

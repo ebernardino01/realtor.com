@@ -1,23 +1,33 @@
 from dotenv import dotenv_values
+from scrapy.utils.project import get_project_settings
 from sqlalchemy import Column, create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Float, String
 
-
-env = dotenv_values(".env")
 DeclarativeBase = declarative_base()
 
 
-def db_connect() -> Engine:
+def create_database_connection() -> Engine:
     """
     Creates database connection using database settings.
-    Returns sqlalchemy engine instance
+
+    Returns sqlalchemy engine instance.
     """
-    return create_engine(env.get("POSTGRES_URL"), pool_size=30, max_overflow=0)
+    env = dotenv_values(".env")
+    db_url = env.get(
+        "POSTGRES_URL", get_project_settings().get("REALTOR_POSTGRES_URL_LOCAL")
+    )
+    if db_url is None:
+        raise ValueError("Database connection URL cannot be None")
+    return create_engine(
+        db_url,
+        pool_size=30,
+        max_overflow=0,
+    )
 
 
-def create_table(engine: Engine):
+def create_tables(engine: Engine):
     """
     Create all tables stored in this metadata.
     Conditional by default, will not attempt to recreate tables already present in the target database.

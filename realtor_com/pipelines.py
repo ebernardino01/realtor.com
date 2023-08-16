@@ -10,7 +10,7 @@ import logging
 from scrapy import Spider
 from sqlalchemy.orm import sessionmaker
 
-from realtor_com.models import Property, create_table, db_connect
+from realtor_com.models import Property, create_database_connection, create_tables
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -22,11 +22,14 @@ class RealtorscraperPipeline:
         Initializes database connection and sessionmaker
         Creates tables
         """
+        self.scraped_items = []
         try:
-            engine = db_connect()
-            create_table(engine)
+            engine = create_database_connection()
+            create_tables(engine)
             self.Session = sessionmaker(bind=engine)
-            self.scraped_items = []
+        except ValueError as ve:
+            logger.error("Database connection problem: ", ve.args)
+            pass
         except Exception as e:
             logger.error("Connection problem: ", e.args)
             pass
@@ -40,8 +43,8 @@ class RealtorscraperPipeline:
             logger.info("Saving events in bulk operation to the database...")
             session.add_all(self.scraped_items)
             session.commit()
-        except Exception as error:
-            logger.exception(error, extra=dict(spider=spider))
+        except Exception as e:
+            logger.exception(e, extra=dict(spider=spider))
             session.rollback()
             raise
         finally:
