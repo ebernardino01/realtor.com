@@ -10,8 +10,8 @@ def run_spider_crawler(q, spider):
     try:
         runner = CrawlerRunner(settings=get_project_settings())
         deferred = runner.crawl(spider)
-        deferred.addBoth(lambda _: reactor.stop())
-        reactor.run()
+        deferred.addBoth(lambda _: reactor.stop())  # type: ignore
+        reactor.run()  # type: ignore
         q.put(None)
     except Exception as e:
         q.put(e)
