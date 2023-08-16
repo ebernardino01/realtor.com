@@ -188,3 +188,4 @@ config/settings/platform/local_override.py
 htmlcov
 celerybeat-schedule
 results/
+cassettes/
