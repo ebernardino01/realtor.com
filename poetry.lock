@@ -55,6 +55,37 @@ html5lib = ["html5lib"]
 lxml = ["lxml"]
 
 [[package]]
+name = "betamax"
+version = "0.8.1"
+description = "A VCR imitation for python-requests"
+optional = false
+python-versions = "*"
+files = [
+    {file = "betamax-0.8.1-py2.py3-none-any.whl", hash = "sha256:aa5ad34cc8d018b35814fb0557d15c78ced9ac56fdc43ccacdb882aa7a5217c1"},
+    {file = "betamax-0.8.1.tar.gz", hash = "sha256:5bf004ceffccae881213fb722f34517166b84a34919b92ffc14d1dbd050b71c2"},
+]
+
+[package.dependencies]
+requests = ">=2.0"
+
+[[package]]
+name = "betamax-serializers"
+version = "0.2.1"
+description = "A set of third-party serializers for Betamax"
+optional = false
+python-versions = "*"
+files = [
+    {file = "betamax-serializers-0.2.1.tar.gz", hash = "sha256:345c419b1b73171f2951c62ac3c701775ac4b76e13e86464ebf0ff2a978e4949"},
+    {file = "betamax_serializers-0.2.1-py2.py3-none-any.whl", hash = "sha256:1b23c46429c40a8873682854c88d805c787c72d252f3fa0c858e9c300682ceac"},
+]
+
+[package.dependencies]
+betamax = ">=0.3.2"
+
+[package.extras]
+yaml11 = ["PyYAML"]
+
+[[package]]
 name = "certifi"
 version = "2023.5.7"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -1223,4 +1254,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "1d4f10a8c4ca935d21955e0d65531064c207033558f0727adc469e8c87aaba1e"
+content-hash = "89b74c2fd7e12a97a8c164938b8f7796e97a91f6d7c9cb094a4bcf004193b2f5"

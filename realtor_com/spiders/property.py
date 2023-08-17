@@ -4,7 +4,7 @@ from http import HTTPStatus
 
 from scrapy.spidermiddlewares.httperror import HttpError
 
-from .base import BaseSpider
+from .base import BaseSpider, request_headers
 
 
 class PropertySpider(BaseSpider):
@@ -146,7 +146,7 @@ class PropertySpider(BaseSpider):
                 yield response.follow(
                     url=page_urls[index],
                     callback=self.parse_results,
-                    headers=self.headers,
+                    headers=request_headers,
                     errback=self.handle_error,
                 )
 

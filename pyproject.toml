@@ -13,6 +13,8 @@ scrapy-fake-useragent = "^1.4.4"
 python-dotenv = "^1.0.0"
 sqlalchemy = "^2.0.17"
 psycopg2-binary = "^2.9.6"
+betamax = "^0.8.1"
+betamax-serializers = "^0.2.1"
 
 
 [build-system]
