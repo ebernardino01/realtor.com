@@ -16,6 +16,11 @@ class PropertySpider(BaseSpider):
     }
 
     def parse_results(self, response):
+        """
+        Callback to process the results of the request
+
+        :param response: scrapy.http.HtmlResponse instance
+        """
         # Check if error page is shown
         error_xpath = response.xpath("//div[contains(@class, 'error-404')]")
         if not error_xpath:
@@ -23,10 +28,10 @@ class PropertySpider(BaseSpider):
             last_page_element = response.xpath(
                 '//a[contains(@aria-label, "Go to next page")]/preceding-sibling::a[1]/@href'
             ).get()
+            page_urls = OrderedDict()
             last_page_element_list = (
                 last_page_element.split("pg-") if last_page_element else []
             )
-            page_urls = OrderedDict()
             if len(last_page_element_list) > 1:
                 # Construct the list of URLs based from the last page number
                 last_page = last_page_element_list[1]
@@ -42,17 +47,15 @@ class PropertySpider(BaseSpider):
                 property_item = OrderedDict()
                 property_item["data_id"] = None
                 property_id_text = row.xpath("./@id").get()
-                property_id_text_list = property_id_text.split("_")
-                if len(property_id_text_list) == 3:
+                if len(property_id_text_list := property_id_text.split("_")) == 3:
                     property_item["data_id"] = int(property_id_text_list[2])
 
                 # Get property media
                 property_item["url"] = ""
                 property_item["media_img"] = ""
-                row_property_media = row.xpath(
+                if row_property_media := row.xpath(
                     ".//div[contains(@class, 'card-image-wrapper')]"
-                )
-                if row_property_media:
+                ):
                     # Property link
                     property_item["url"] = row_property_media.xpath(".//a/@href").get()
 
@@ -72,10 +75,9 @@ class PropertySpider(BaseSpider):
                 property_item["city"] = ""
                 property_item["state"] = ""
                 property_item["zip_code"] = ""
-                row_property_details = row.xpath(
+                if row_property_details := row.xpath(
                     ".//div[contains(@class, 'card-content')]"
-                )
-                if row_property_details:
+                ):
                     # Property status
                     property_item["status"] = row_property_details.xpath(
                         ".//div[contains(@data-testid, 'card-description')]/div/text()"
@@ -106,10 +108,9 @@ class PropertySpider(BaseSpider):
                     row_lot_area = row_property_details.xpath(
                         ".//li[contains(@data-testid, 'property-meta-lot-size')]/span"
                     )
-                    area_lot = row_lot_area.xpath(".//text()").get()
-                    area_lot_unit = row_lot_area.xpath("./text()").get()
-                    if area_lot:
+                    if area_lot := row_lot_area.xpath(".//text()").get():
                         property_item["sqftlot"] = float(area_lot.replace(",", ""))
+                        area_lot_unit = row_lot_area.xpath("./text()").get()
                         if area_lot_unit and "acre" in area_lot_unit:
                             property_item["sqftlot"] = property_item["sqftlot"] * 43560
 
@@ -151,6 +152,11 @@ class PropertySpider(BaseSpider):
                 )
 
     def handle_error(self, failure):
+        """
+        Error callback function
+
+        :param failure: Twisted Failure instance
+        """
         # Check if the failure is due to a 403 error
         if (
             failure.check(HttpError)
