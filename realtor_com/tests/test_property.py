@@ -1,11 +1,18 @@
 from collections import OrderedDict
+from datetime import datetime
+from unittest import TestCase
 from unittest import main as unittest_main
+from unittest.mock import Mock
 from unittest.mock import patch as unittest_patch
 
 from betamax import Betamax
 from betamax.fixtures.unittest import BetamaxTestCase
 from scrapy.http import HtmlResponse
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
+from realtor_com.models import Property, create_database_connection, create_tables
+from realtor_com.pipelines import PropertyscraperPipeline
 from realtor_com.spiders.base import request_headers
 from realtor_com.spiders.property import PropertySpider
 
@@ -69,6 +76,134 @@ class TestPropertySpider(BetamaxTestCase):
 
                 self.assertEqual(yield_keys, result_keys)
                 self.assertEqual(len(yield_keys), len(result_keys))
+
+
+@unittest_patch("realtor_com.models.dotenv_values")
+@unittest_patch("realtor_com.models.get_project_settings")
+@unittest_patch("realtor_com.models.create_engine")
+class TestCreateDatabaseConnection(TestCase):
+    def test_create_database_connection(
+        self, mock_create_engine, mock_get_project_settings, mock_dotenv_values
+    ):
+        # Set up mocks and test data
+        mock_env = {"POSTGRES_URL": "test_db_url"}
+        mock_dotenv_values.return_value = mock_env
+        mock_project_settings = {"REALTOR_POSTGRES_URL_LOCAL": "test_db_url"}
+        mock_get_project_settings.return_value = mock_project_settings
+
+        # Perform the test
+        engine = create_database_connection()
+
+        # Assertions
+        mock_dotenv_values.assert_called_once_with(".env")
+        mock_get_project_settings.assert_called_once()
+        mock_create_engine.assert_called_once_with(
+            "test_db_url", pool_size=30, max_overflow=0
+        )
+        self.assertEqual(engine, mock_create_engine.return_value)
+
+    def test_create_database_connection_missing_url(
+        self, mock_create_engine, mock_get_project_settings, mock_dotenv_values
+    ):
+        # Set up mocks and test data
+        mock_env = {"POSTGRES_URL": None}
+        mock_dotenv_values.return_value = mock_env
+        mock_project_settings = {"REALTOR_POSTGRES_URL_LOCAL": None}
+        mock_get_project_settings.return_value = mock_project_settings
+
+        # Perform the test
+        with self.assertRaises(ValueError):
+            create_database_connection()
+
+        # Assertions
+        mock_dotenv_values.assert_called_once_with(".env")
+        mock_get_project_settings.assert_called_once()
+        mock_create_engine.assert_not_called()
+
+
+class TestCreateTables(TestCase):
+    @unittest_patch("realtor_com.models.DeclarativeBase.metadata.create_all")
+    def test_create_tables(self, mock_create_all):
+        # Set up mocks and test data
+        mock_engine = create_engine("sqlite:///:memory:")
+
+        # Perform the test
+        create_tables(mock_engine)
+
+        # Assertions
+        mock_create_all.assert_called_once_with(mock_engine)
+
+
+class TestPropertyscraperPipelineInit(TestCase):
+    @unittest_patch("realtor_com.pipelines.sessionmaker")
+    def test_init(self, mock_sessionmaker):
+        # Set up mocks and test data
+        mock_engine = create_engine("sqlite:///:memory:")
+        mock_sessionmaker.return_value = mock_engine
+
+        # Perform the test
+        pipeline = PropertyscraperPipeline()
+
+        # Assertions
+        self.assertIsNotNone(pipeline.Session)
+
+    @unittest_patch("realtor_com.pipelines.create_database_connection")
+    def test_init_exception(self, mock_create_database_connection):
+        # Set up mocks to raise an exception
+        mock_create_database_connection.side_effect = ValueError("Test exception")
+        with self.assertLogs(level="ERROR") as error_log_context:
+            # Perform the test
+            PropertyscraperPipeline()
+
+            # Assertions
+            self.assertEqual(len(error_log_context.output), 1)
+            self.assertIn("Database connection problem:", error_log_context.output[0])
+
+
+class TestPropertyscraperPipelineProcess(TestCase):
+    @unittest_patch("realtor_com.pipelines.sessionmaker")
+    def setUp(self, mock_sessionmaker) -> None:
+        # Set up mock objects and test data
+        mock_engine = create_engine("sqlite:///:memory:")
+        create_tables(mock_engine)
+        mock_sessionmaker.return_value = sessionmaker(bind=mock_engine)
+        self.pipeline = PropertyscraperPipeline()
+
+    def test_process_item_new_item(self):
+        # Set the item data (replace with your actual item data)
+        item_data = {
+            "data_id": 1,
+            "url": "http://example.com",
+            "media_img": "",
+            "status": "",
+            "price": "",
+            "beds": "",
+            "baths": "",
+            "sqft": 1,
+            "sqftlot": 1,
+            "address": "",
+            "city": "",
+            "state": "",
+            "zip_code": "",
+            "scraped_date_time": datetime.now(),
+        }
+        with self.pipeline.Session() as test_session:
+            self.assertEqual(
+                test_session.query(Property)
+                .filter_by(
+                    data_id=item_data["data_id"],
+                    address=item_data["address"],
+                    city=item_data["city"],
+                    state=item_data["state"],
+                    zip_code=item_data["zip_code"],
+                )
+                .first(),
+                None,
+            )
+
+            # Perform the test
+            self.pipeline.process_item(item_data, Mock())
+            self.assertEqual(len(self.pipeline.scraped_items), 1)
 
 
 if __name__ == "__main__":

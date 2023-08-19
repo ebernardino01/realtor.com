@@ -28,10 +28,10 @@ class RealtorscraperPipeline:
             create_tables(engine)
             self.Session = sessionmaker(bind=engine)
         except ValueError as ve:
-            logger.error("Database connection problem: ", ve.args)
+            logger.error(f"Database connection problem: {ve.args}")
             pass
         except Exception as e:
-            logger.error("Connection problem: ", e.args)
+            logger.error(f"Connection problem: {e.args}")
             pass
 
     def close_spider(self, spider: Spider) -> None:
