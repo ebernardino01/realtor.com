@@ -168,10 +168,7 @@ class TestPropertyscraperPipelineProcess(TestCase):
         create_tables(mock_engine)
         mock_sessionmaker.return_value = sessionmaker(bind=mock_engine)
         self.pipeline = PropertyscraperPipeline()
-
-    def test_process_item_new_item(self):
-        # Set the item data (replace with your actual item data)
-        item_data = {
+        self.test_item_data = {
             "data_id": 1,
             "url": "http://example.com",
             "media_img": "",
@@ -187,23 +184,37 @@ class TestPropertyscraperPipelineProcess(TestCase):
             "zip_code": "",
             "scraped_date_time": datetime.now(),
         }
+
+    def test_process_item_new_item(self):
         with self.pipeline.Session() as test_session:
+            # Assert that there is no data in the test database
             self.assertEqual(
                 test_session.query(Property)
                 .filter_by(
-                    data_id=item_data["data_id"],
-                    address=item_data["address"],
-                    city=item_data["city"],
-                    state=item_data["state"],
-                    zip_code=item_data["zip_code"],
+                    data_id=self.test_item_data["data_id"],
+                    address=self.test_item_data["address"],
+                    city=self.test_item_data["city"],
+                    state=self.test_item_data["state"],
+                    zip_code=self.test_item_data["zip_code"],
                 )
                 .first(),
                 None,
             )
 
             # Perform the test
-            self.pipeline.process_item(item_data, Mock())
+            self.pipeline.process_item(self.test_item_data, Mock())
+
+            # Assertions
             self.assertEqual(len(self.pipeline.scraped_items), 1)
+
+    def test_process_item_same_item(self):
+        # Perform the test
+        self.pipeline.process_item(self.test_item_data, Mock())
+        self.assertEqual(len(self.pipeline.scraped_items), 1)
+
+        # Run again the test
+        self.pipeline.process_item(self.test_item_data, Mock())
+        self.assertEqual(len(self.pipeline.scraped_items), 1)
 
 
 if __name__ == "__main__":

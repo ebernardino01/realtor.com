@@ -3,8 +3,6 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
-
-# useful for handling different item types with a single interface
 import logging
 
 from scrapy import Spider
@@ -28,10 +26,10 @@ class RealtorscraperPipeline:
             create_tables(engine)
             self.Session = sessionmaker(bind=engine)
         except ValueError as ve:
-            logger.error(f"Database connection problem: {ve.args}")
+            logger.exception(f"Database connection problem: {ve.args}")
             pass
         except Exception as e:
-            logger.error(f"Connection problem: {e.args}")
+            logger.exception(f"Connection problem: {e.args}")
             pass
 
     def close_spider(self, spider: Spider) -> None:
@@ -58,7 +56,7 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
         """
         session = self.Session()
 
-        # Check if scraped item already exists
+        # Check if scraped item already exists in the database
         existing_property = (
             session.query(Property)
             .filter_by(
@@ -87,6 +85,18 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
             property_item.state = item["state"]
             property_item.zip_code = item["zip_code"]
             property_item.scraped_date_time = item["scraped_date_time"]
-            self.scraped_items.append(property_item)
+
+            # Check first if the list already contains the item
+            def is_duplicate(existing_item):
+                return (
+                    existing_item.data_id == property_item.data_id
+                    and existing_item.url == property_item.url
+                    and existing_item.address == property_item.address
+                    and existing_item.city == property_item.city
+                    and existing_item.state == property_item.state
+                )
+
+            if not any(filter(is_duplicate, self.scraped_items)):
+                self.scraped_items.append(property_item)
 
         return item

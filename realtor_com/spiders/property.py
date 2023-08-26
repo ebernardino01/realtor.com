@@ -100,8 +100,7 @@ class PropertySpider(BaseSpider):
                     row_area = row_property_details.xpath(
                         ".//li[contains(@data-testid, 'property-meta-sqft')]/span"
                     )
-                    area = row_area.xpath(".//text()").get()
-                    if area:
+                    if area := row_area.xpath(".//text()").get():
                         property_item["sqft"] = float(area.replace(",", ""))
 
                     # Property lot area
