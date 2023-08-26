@@ -15,16 +15,30 @@ logger.setLevel(logging.ERROR)
 
 
 class RealtorscraperPipeline:
+    @property
+    def session(self):
+        """
+        The sessionmaker instance of the pipeline
+        """
+        return self._Session
+
+    @property
+    def scraped_items(self):
+        """
+        The scraped items list of the pipeline
+        """
+        return self._scraped_items
+
     def __init__(self):
         """
         Initializes database connection and sessionmaker
         Creates tables
         """
-        self.scraped_items = []
+        self._scraped_items = []
         try:
             engine = create_database_connection()
             create_tables(engine)
-            self.Session = sessionmaker(bind=engine)
+            self._Session = sessionmaker(bind=engine)
         except ValueError as ve:
             logger.exception(f"Database connection problem: {ve.args}")
             pass
@@ -36,10 +50,10 @@ class RealtorscraperPipeline:
         """
         Saving all the scraped events in bulk on spider close event
         """
-        session = self.Session()
+        session = self._Session()
         try:
             logger.info("Saving events in bulk operation to the database...")
-            session.add_all(self.scraped_items)
+            session.bulk_save_objects(self._scraped_items)
             session.commit()
         except Exception as e:
             logger.exception(e, extra=dict(spider=spider))
@@ -54,7 +68,7 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
         """
         This method is called for every item pipeline component
         """
-        session = self.Session()
+        session = self._Session()
 
         # Check if scraped item already exists in the database
         existing_property = (
@@ -96,7 +110,7 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
                     and existing_item.state == property_item.state
                 )
 
-            if not any(filter(is_duplicate, self.scraped_items)):
-                self.scraped_items.append(property_item)
+            if not any(filter(is_duplicate, self._scraped_items)):
+                self._scraped_items.append(property_item)
 
         return item

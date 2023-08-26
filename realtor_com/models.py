@@ -3,7 +3,7 @@ from scrapy.utils.project import get_project_settings
 from sqlalchemy import Column, create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Float, String
+from sqlalchemy.types import BigInteger, DateTime, Float, Integer, String
 
 DeclarativeBase = declarative_base()
 
@@ -44,7 +44,7 @@ class Property(DeclarativeBase):
 
     __tablename__ = "property"
 
-    id = Column("id", BigInteger, primary_key=True)
+    id = Column("id", BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     data_id = Column(BigInteger, index=True)
     url = Column("url", String)
     media_img = Column("media_img", String)

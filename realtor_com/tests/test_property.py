@@ -145,7 +145,7 @@ class TestPropertyscraperPipelineInit(TestCase):
         pipeline = PropertyscraperPipeline()
 
         # Assertions
-        self.assertIsNotNone(pipeline.Session)
+        self.assertIsNotNone(pipeline.session)
 
     @unittest_patch("realtor_com.pipelines.create_database_connection")
     def test_init_exception(self, mock_create_database_connection):
@@ -186,7 +186,7 @@ class TestPropertyscraperPipelineProcess(TestCase):
         }
 
     def test_process_item_new_item(self):
-        with self.pipeline.Session() as test_session:
+        with self.pipeline.session() as test_session:
             # Assert that there is no data in the test database
             self.assertEqual(
                 test_session.query(Property)
@@ -215,6 +215,55 @@ class TestPropertyscraperPipelineProcess(TestCase):
         # Run again the test
         self.pipeline.process_item(self.test_item_data, Mock())
         self.assertEqual(len(self.pipeline.scraped_items), 1)
+
+    def test_close_spider(self):
+        with self.pipeline.session() as test_session:
+            self.pipeline.process_item(self.test_item_data, Mock())
+            self.pipeline.close_spider(Mock())
+            first_item = (
+                test_session.query(Property)
+                .filter_by(
+                    data_id=self.test_item_data["data_id"],
+                    address=self.test_item_data["address"],
+                    city=self.test_item_data["city"],
+                    state=self.test_item_data["state"],
+                    zip_code=self.test_item_data["zip_code"],
+                )
+                .all()
+            )
+            self.assertNotEqual(first_item, None)
+            self.assertEqual(len(first_item), 1)
+            self.assertEqual(first_item[0].data_id, 1)
+
+    @unittest_patch("realtor_com.pipelines.logger")
+    @unittest_patch("realtor_com.pipelines.RealtorscraperPipeline.session")
+    def test_close_spider_exception(self, mock_session, mock_logger):
+        # Set up mock objects and test data
+        mock_spider = Mock()
+
+        # Simulate an exception being raised during the session actions
+        mock_session.side_effect = Exception("Test exception")
+
+        # Execute the method and capture the raised exception
+        with self.assertRaises(Exception) as exception_context:
+            # Perform the test
+            self.pipeline.process_item(self.test_item_data, mock_spider)
+            self.pipeline.close_spider(mock_spider)
+
+            # Assertions
+            mock_session.assert_called_once()  # Session is created
+            mock_logger.info.assert_called_once_with(
+                "Saving events in bulk operation to the database..."
+            )
+            mock_session.return_value.bulk_save_objects.assert_called_once_with(
+                self.pipeline.scraped_items
+            )
+            mock_session.return_value.commit.assert_not_called()  # Exception prevents commit
+            mock_session.return_value.rollback.assert_called_once()  # Rollback is called
+            mock_logger.exception.assert_called_once_with(
+                exception_context.exception, extra={"spider": mock_spider}
+            )
+            mock_session.return_value.close.assert_called_once()  # Session is closed
 
 
 if __name__ == "__main__":
