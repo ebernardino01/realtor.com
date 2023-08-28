@@ -1,10 +1,15 @@
+import logging
 from collections import OrderedDict
 from datetime import datetime
 from http import HTTPStatus
 
 from scrapy.spidermiddlewares.httperror import HttpError
+from twisted.internet.error import DNSLookupError, TCPTimedOutError, TimeoutError
 
 from .base import BaseSpider, request_headers
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 
 class PropertySpider(BaseSpider):
@@ -156,14 +161,15 @@ class PropertySpider(BaseSpider):
 
         :param failure: Twisted Failure instance
         """
-        # Check if the failure is due to a 403 error
-        if (
-            failure.check(HttpError)
-            and failure.value.response.status == HTTPStatus.FORBIDDEN
-        ):
-            self.logger.warning(
-                "Skipping URL due to 403 error: %s", failure.request.url
-            )
-        else:
-            # Handle other types of errors if needed
-            self.logger.error("Error processing URL: %s", failure.request.url)
+
+        if failure.check(HttpError):
+            # Check if the failure is due to a 403 error
+            if failure.value.response.status == HTTPStatus.FORBIDDEN:
+                logger.warning(
+                    "Skipping URL due to 403 error: %s", failure.value.response.url
+                )
+            else:
+                logger.error("Error processing URL: %s", failure.value.response.url)
+        elif failure.check(DNSLookupError, TimeoutError, TCPTimedOutError):
+            # Check also for DNS lookup and timeout errors
+            logger.error(failure.getErrorMessage())

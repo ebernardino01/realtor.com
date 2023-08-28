@@ -15,12 +15,16 @@ logger.setLevel(logging.ERROR)
 
 
 class RealtorscraperPipeline:
+    """
+    Main pipeline implementation class
+    """
+
     @property
     def session(self):
         """
         The sessionmaker instance of the pipeline
         """
-        return self._Session
+        return self._session
 
     @property
     def scraped_items(self):
@@ -31,26 +35,25 @@ class RealtorscraperPipeline:
 
     def __init__(self):
         """
-        Initializes database connection and sessionmaker
-        Creates tables
+        Initializes database connection, creates tables and sessionmaker instances
         """
         self._scraped_items = []
         try:
             engine = create_database_connection()
             create_tables(engine)
-            self._Session = sessionmaker(bind=engine)
+            self._session = sessionmaker(bind=engine)
         except ValueError as ve:
             logger.exception(f"Database connection problem: {ve.args}")
             pass
         except Exception as e:
             logger.exception(f"Connection problem: {e.args}")
-            pass
+            raise
 
     def close_spider(self, spider: Spider) -> None:
         """
         Saving all the scraped events in bulk on spider close event
         """
-        session = self._Session()
+        session = self._session()
         try:
             logger.info("Saving events in bulk operation to the database...")
             session.bulk_save_objects(self._scraped_items)
@@ -61,6 +64,7 @@ class RealtorscraperPipeline:
             raise
         finally:
             session.close()
+            self._scraped_items.clear()
 
 
 class PropertyscraperPipeline(RealtorscraperPipeline):
@@ -68,7 +72,7 @@ class PropertyscraperPipeline(RealtorscraperPipeline):
         """
         This method is called for every item pipeline component
         """
-        session = self._Session()
+        session = self._session()
 
         # Check if scraped item already exists in the database
         existing_property = (

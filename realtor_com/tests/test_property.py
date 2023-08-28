@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from datetime import datetime
+from http import HTTPStatus
 from unittest import TestCase
 from unittest import main as unittest_main
 from unittest.mock import Mock
@@ -8,8 +9,12 @@ from unittest.mock import patch as unittest_patch
 from betamax import Betamax
 from betamax.fixtures.unittest import BetamaxTestCase
 from scrapy.http import HtmlResponse
+from scrapy.spidermiddlewares.httperror import HttpError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from twisted.internet.error import TimeoutError
+from twisted.python.failure import Failure
+from twisted.trial import unittest as twisted_unittest
 
 from realtor_com.models import Property, create_database_connection, create_tables
 from realtor_com.pipelines import PropertyscraperPipeline
@@ -115,23 +120,36 @@ class TestCreateDatabaseConnection(TestCase):
         with self.assertRaises(ValueError):
             create_database_connection()
 
-        # Assertions
-        mock_dotenv_values.assert_called_once_with(".env")
-        mock_get_project_settings.assert_called_once()
-        mock_create_engine.assert_not_called()
+            # Assertions
+            mock_dotenv_values.assert_called_once_with(".env")
+            mock_get_project_settings.assert_called_once()
+            mock_create_engine.assert_not_called()
 
 
 class TestCreateTables(TestCase):
+    def setUp(self) -> None:
+        # Set up sqlite mock engine
+        self.mock_engine = create_engine("sqlite:///:memory:")
+
     @unittest_patch("realtor_com.models.DeclarativeBase.metadata.create_all")
     def test_create_tables(self, mock_create_all):
-        # Set up mocks and test data
-        mock_engine = create_engine("sqlite:///:memory:")
-
         # Perform the test
-        create_tables(mock_engine)
+        create_tables(self.mock_engine)
 
         # Assertions
-        mock_create_all.assert_called_once_with(mock_engine)
+        mock_create_all.assert_called_once_with(self.mock_engine)
+
+    @unittest_patch("realtor_com.models.DeclarativeBase.metadata.create_all")
+    def test_create_tables_with_exception(self, mock_create_all):
+        # Simulate an exception being raised during create_all
+        mock_create_all.side_effect = Exception("Test exception")
+
+        # Perform the test
+        with self.assertRaises(Exception):
+            create_tables(self.mock_engine)
+
+            # Assertions
+            mock_create_all.assert_called_once_with(self.mock_engine)
 
 
 class TestPropertyscraperPipelineInit(TestCase):
@@ -148,9 +166,9 @@ class TestPropertyscraperPipelineInit(TestCase):
         self.assertIsNotNone(pipeline.session)
 
     @unittest_patch("realtor_com.pipelines.create_database_connection")
-    def test_init_exception(self, mock_create_database_connection):
-        # Set up mocks to raise an exception
-        mock_create_database_connection.side_effect = ValueError("Test exception")
+    def test_init_with_value_error(self, mock_create_database_connection):
+        # Set up mocks to raise a ValueError
+        mock_create_database_connection.side_effect = ValueError("Test value error")
         with self.assertLogs(level="ERROR") as error_log_context:
             # Perform the test
             PropertyscraperPipeline()
@@ -158,6 +176,18 @@ class TestPropertyscraperPipelineInit(TestCase):
             # Assertions
             self.assertEqual(len(error_log_context.output), 1)
             self.assertIn("Database connection problem:", error_log_context.output[0])
+
+    @unittest_patch("realtor_com.pipelines.logger")
+    @unittest_patch("realtor_com.pipelines.create_database_connection")
+    def test_init_with_exception(self, mock_logger, mock_create_database_connection):
+        # Set up mocks to raise an Exception
+        mock_create_database_connection.side_effect = Exception("Test exception")
+        with self.assertRaises(Exception) as exception_context:
+            # Perform the test
+            PropertyscraperPipeline()
+
+            # Assertions
+            mock_logger.exception.assert_called_once_with(exception_context.exception)
 
 
 class TestPropertyscraperPipelineProcess(TestCase):
@@ -184,6 +214,7 @@ class TestPropertyscraperPipelineProcess(TestCase):
             "zip_code": "",
             "scraped_date_time": datetime.now(),
         }
+        self.mock_spider = Mock()
 
     def test_process_item_new_item(self):
         with self.pipeline.session() as test_session:
@@ -202,24 +233,36 @@ class TestPropertyscraperPipelineProcess(TestCase):
             )
 
             # Perform the test
-            self.pipeline.process_item(self.test_item_data, Mock())
+            self.pipeline.process_item(self.test_item_data, self.mock_spider)
 
             # Assertions
             self.assertEqual(len(self.pipeline.scraped_items), 1)
 
     def test_process_item_same_item(self):
         # Perform the test
-        self.pipeline.process_item(self.test_item_data, Mock())
+        self.pipeline.process_item(self.test_item_data, self.mock_spider)
         self.assertEqual(len(self.pipeline.scraped_items), 1)
 
         # Run again the test
-        self.pipeline.process_item(self.test_item_data, Mock())
+        self.pipeline.process_item(self.test_item_data, self.mock_spider)
         self.assertEqual(len(self.pipeline.scraped_items), 1)
+
+    def test_process_item_existing(self):
+        # Process the test item data and save to the database
+        self.pipeline.process_item(self.test_item_data, self.mock_spider)
+        self.pipeline.close_spider(self.mock_spider)
+
+        # Perform the test
+        self.pipeline.process_item(self.test_item_data, self.mock_spider)
+        self.assertEqual(len(self.pipeline.scraped_items), 0)
 
     def test_close_spider(self):
         with self.pipeline.session() as test_session:
-            self.pipeline.process_item(self.test_item_data, Mock())
-            self.pipeline.close_spider(Mock())
+            # Process the test item data and save to the database
+            self.pipeline.process_item(self.test_item_data, self.mock_spider)
+            self.pipeline.close_spider(self.mock_spider)
+
+            # Query the test item data
             first_item = (
                 test_session.query(Property)
                 .filter_by(
@@ -231,24 +274,23 @@ class TestPropertyscraperPipelineProcess(TestCase):
                 )
                 .all()
             )
+
+            # Assertions
             self.assertNotEqual(first_item, None)
             self.assertEqual(len(first_item), 1)
             self.assertEqual(first_item[0].data_id, 1)
 
     @unittest_patch("realtor_com.pipelines.logger")
     @unittest_patch("realtor_com.pipelines.RealtorscraperPipeline.session")
-    def test_close_spider_exception(self, mock_session, mock_logger):
-        # Set up mock objects and test data
-        mock_spider = Mock()
-
+    def test_close_spider_with_exception(self, mock_session, mock_logger):
         # Simulate an exception being raised during the session actions
         mock_session.side_effect = Exception("Test exception")
 
         # Execute the method and capture the raised exception
         with self.assertRaises(Exception) as exception_context:
             # Perform the test
-            self.pipeline.process_item(self.test_item_data, mock_spider)
-            self.pipeline.close_spider(mock_spider)
+            self.pipeline.process_item(self.test_item_data, self.mock_spider)
+            self.pipeline.close_spider(self.mock_spider)
 
             # Assertions
             mock_session.assert_called_once()  # Session is created
@@ -261,9 +303,68 @@ class TestPropertyscraperPipelineProcess(TestCase):
             mock_session.return_value.commit.assert_not_called()  # Exception prevents commit
             mock_session.return_value.rollback.assert_called_once()  # Rollback is called
             mock_logger.exception.assert_called_once_with(
-                exception_context.exception, extra={"spider": mock_spider}
+                exception_context.exception, extra={"spider": self.mock_spider}
             )
             mock_session.return_value.close.assert_called_once()  # Session is closed
+
+
+class TestHandleError(twisted_unittest.TestCase):
+    def setUp(self):
+        self.property_spider = PropertySpider()
+        self.test_url = "https://response.com"
+
+    @unittest_patch("realtor_com.spiders.property.logger")
+    def test_handle_403_error(self, mock_logger):
+        # Simulate a 403 (Forbidden) HTTP error
+        failure = Failure(
+            HttpError(
+                HtmlResponse(
+                    url=self.test_url,
+                    status=HTTPStatus.FORBIDDEN,
+                    encoding="utf-8",
+                )
+            )
+        )
+
+        # Call the handle_error method
+        self.property_spider.handle_error(failure)
+
+        # Assertions
+        mock_logger.warning.assert_called_once_with(
+            "Skipping URL due to 403 error: %s", self.test_url
+        )
+
+    @unittest_patch("realtor_com.spiders.property.logger")
+    def test_handle_other_http_error(self, mock_logger):
+        # Simulate a 429 (Too Many Requests) HTTP error
+        failure = Failure(
+            HttpError(
+                HtmlResponse(
+                    url=self.test_url,
+                    status=HTTPStatus.TOO_MANY_REQUESTS,
+                    encoding="utf-8",
+                )
+            )
+        )
+
+        # Call the handle_error method
+        self.property_spider.handle_error(failure)
+
+        # Assertions
+        mock_logger.error.assert_called_once_with(
+            "Error processing URL: %s", self.test_url
+        )
+
+    @unittest_patch("realtor_com.spiders.property.logger")
+    def test_handle_other_error(self, mock_logger):
+        failure = Failure(TimeoutError(self.test_url))
+
+        # Call the handle_error method
+        self.property_spider.handle_error(failure)
+
+        # Assertions
+        error_message = f"User timeout caused connection failure: {self.test_url}."
+        mock_logger.error.assert_called_once_with(error_message)
 
 
 if __name__ == "__main__":
